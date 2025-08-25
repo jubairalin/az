@@ -1,0 +1,33 @@
+- task: PowerShell@2
+  displayName: 'Secure Git Clone and Deploy'
+  env:
+    GIT_ASKPASS: $(System.AccessToken)
+  inputs:
+    targetType: 'inline'
+    script: |
+      try {
+        # Set variables
+        $sourceRepo = "https://dev.azure.com/your-org/your-project/_git/CertScanConfig"
+        $sourceFile = "QA/application_stgedicoreneb01.properties"
+        $tempDir = "$env:TEMP\CertScanClone"
+        
+        # Clean previous temp directory
+        if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+        
+        Write-Host "Authenticating with Azure DevOps..."
+        
+        # Clone repository
+        git clone --depth 1 --quiet $sourceRepo $tempDir
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Git clone failed with error code: $LASTEXITCODE"
+        }
+        
+        Write-Host "Repository cloned successfully"
+        
+        # Rest of your deployment logic here...
+        
+      } catch {
+        Write-Error "Deployment failed: $($_.Exception.Message)"
+        exit 1
+      }
