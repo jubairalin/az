@@ -1,0 +1,106 @@
+# Configuration variables
+$sourceFile = "DEV/application_istedicoreneb01.properties"  # Path relative to repository root
+$destinationHost = "tstedicoreneb01"
+$destinationPath = "F:\certscan\"
+$destinationFile = "application.properties"
+$backupPath = "F:\certscan\backup\"
+
+# Get the repository root directory from Azure DevOps built-in variable
+$repoRoot = $env:BUILD_SOURCESDIRECTORY
+if (-not $repoRoot) {
+    $repoRoot = "C:\azagent\a1\_work\1\s"  # Fallback path
+}
+Write-Host "Repository root directory: $repoRoot"
+
+try {
+    # Check if source file exists in the current repository
+    $sourceFilePath = Join-Path $repoRoot $sourceFile
+    Write-Host "Looking for source file: $sourceFilePath"
+    
+    if (-not (Test-Path $sourceFilePath)) {
+        Write-Host "Available files in repository:"
+        Get-ChildItem $repoRoot -Recurse -File | ForEach-Object { Write-Host "  $($_.FullName)" }
+        throw "Source file not found: $sourceFilePath"
+    }
+    
+    Write-Host "Source file found: $sourceFilePath"
+    Write-Host "File size: $((Get-Item $sourceFilePath).Length) bytes"
+    
+    # Display file structure for verification
+    Write-Host "DEV folder contents:"
+    $devFolder = Join-Path $repoRoot "DEV"
+    if (Test-Path $devFolder) {
+        Get-ChildItem $devFolder -File | ForEach-Object { Write-Host "  $($_.Name)" }
+    }
+    
+    # Create backup directory if it doesn't exist
+    if (-not (Test-Path $backupPath)) {
+        Write-Host "Creating backup directory: $backupPath"
+        New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+    }
+    
+    # Create backup of current application.properties if it exists
+    $currentAppProperties = Join-Path $destinationPath $destinationFile
+    if (Test-Path $currentAppProperties) {
+        $backupFile = "application.properties.backup.$(Get-Date -Format 'yyyyMMddHHmmss')"
+        $backupFilePath = Join-Path $backupPath $backupFile
+        Write-Host "Creating backup: $backupFilePath"
+        Copy-Item $currentAppProperties $backupFilePath -Force
+        Write-Host "Backup created successfully"
+    } else {
+        Write-Host "No existing application.properties found for backup"
+    }
+    
+    # Ensure destination directory exists
+    if (-not (Test-Path $destinationPath)) {
+        Write-Host "Creating destination directory: $destinationPath"
+        New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+    }
+    
+    # Copy and rename the file
+    Write-Host "Copying file to: $destinationPath$destinationFile"
+    Write-Host "Source: $sourceFilePath"
+    Write-Host "Destination: $destinationPath$destinationFile"
+    
+    Copy-Item $sourceFilePath (Join-Path $destinationPath $destinationFile) -Force
+    
+    # Verify the file was copied
+    $finalDestination = Join-Path $destinationPath $destinationFile
+    if (Test-Path $finalDestination) {
+        $fileSize = (Get-Item $finalDestination).Length
+        Write-Host "SUCCESS: File deployed successfully to $finalDestination (Size: $fileSize bytes)"
+        
+        # Display first few lines for verification
+        Write-Host "File preview (first 5 lines):"
+        Get-Content $finalDestination -Head 5 | ForEach-Object { Write-Host "  $_" }
+        
+        # Verify content matches source
+        $sourceHash = (Get-FileHash $sourceFilePath -Algorithm MD5).Hash
+        $destHash = (Get-FileHash $finalDestination -Algorithm MD5).Hash
+        
+        if ($sourceHash -eq $destHash) {
+            Write-Host "VERIFICATION: File content matches source (MD5 hash verified)"
+        } else {
+            Write-Warning "WARNING: File content verification failed - hashes don't match"
+        }
+    } else {
+        throw "Deployment failed - file not found at destination: $finalDestination"
+    }
+    
+} catch {
+    Write-Error "ERROR: $($_.Exception.Message)"
+    Write-Error "Deployment failed. Check file paths and permissions."
+    exit 1
+}
+
+Write-Host "Script execution completed successfully!"
+Write-Host "File copied from $sourceFile to $destinationHost F:\certscan\application.properties"
+
+
+- task: PowerShell@2
+  displayName: 'Deploy DEV Properties to tstedicoreneb01'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Copy the optimized PowerShell script above here
+    failOnStderr: true
