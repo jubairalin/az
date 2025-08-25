@@ -1,1 +1,29 @@
+trigger:
+- main
 
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  azureRepoUrl: 'https://dev.azure.com/your-organization/your-project/_git/your-repo'
+  gitUsername: 'your-username'
+  gitPassword: '$(your-pat-token)'  # Store PAT token in pipeline variables/secrets
+
+steps:
+- task: CmdLine@2
+  displayName: 'Clone Azure Repository'
+  inputs:
+    script: |
+      # Create directory if it doesn't exist
+      if not exist "F:\edi" mkdir "F:\edi"
+      
+      # Navigate to target directory
+      cd /d "F:\edi"
+      
+      # Clone repository with authentication
+      git clone -c http.extraHeader="AUTHORIZATION: bearer $(gitPassword)" $(azureRepoUrl) .
+      
+      # Alternatively using username:token format
+      # git clone https://$(gitUsername):$(gitPassword)@dev.azure.com/your-organization/your-project/_git/your-repo .
+
+    workingDirectory: 'F:\edi'
